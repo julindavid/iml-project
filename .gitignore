@@ -1,0 +1,5 @@
+# CSV files that do not have to be added to GIT
+diabetic_data.csv
+IDS_mapping.csv
+diabetic_data
+IDS_mapping
