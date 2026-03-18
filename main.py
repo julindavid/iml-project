@@ -4,7 +4,12 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression as lr
 import seaborn as sns
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+
+
+
+df = pd.read_csv('fixed_diabetes.csv')
+df.head()
 
 
 #COLORS!
@@ -47,5 +52,5 @@ def checkdata(data):
             list2.append(feature)
     return list1, list2
 
-l1, l2 = checkdata(data)
+# l1, l2 = checkdata(data)
 

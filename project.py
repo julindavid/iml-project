@@ -282,4 +282,3 @@ print(f'CSV file &quot;{csv_file_path}&quot; has been created successfully.')
 #--------------------------------------------------------------------------------
 #1.4 PCA
 
-# train_data.head()
