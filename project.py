@@ -5,6 +5,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression as lr
 import seaborn as sns
 from sklearn.preprocessing import OneHotEncoder
+import csv
 
 #Colors used in plots and other stuff!
 class c:
@@ -59,6 +60,15 @@ def check_missing_values(data):
     print(f"{c.BOLD}Printing how many entries in each column contain no NaN values{c.END}:")
 
 
+def apply_grouped_mapping(df, column, grouping_dict):
+    """
+    Flattens a grouping dictionary and maps it to a DataFrame column.
+    """
+    # Create the flat map: {1: 'Emergency', 7: 'Emergency', 2: 'Urgent'...}
+    flat_map = {idx: group_name for group_name, id_list in grouping_dict.items() for idx in id_list}
+    
+    # Map the new names and fill any missing IDs with 'Other'
+    return df[column].map(flat_map).fillna('Other')
 train_data = pd.read_csv("train.csv")
 keys = train_data.keys()
 
@@ -136,17 +146,64 @@ train_data = train_data.drop(columns="medical_specialty") #low amount of values
 
 
 nan_features, string_features = checkdata(train_data)
-print(f"features that have NaN values: {nan_features}")
-print(f"features that have string values: {string_features}")
+# print(f"features that have NaN values: {nan_features}")
+# print(f"features that have string values: {string_features}")
 train_data = train_data.drop(columns="encounter_id") #irrelevant
 train_data = train_data.drop(columns="examide") # Only one value (NO)
 train_data = train_data.drop(columns="troglitazone") # Only one value (NO)
 train_data = train_data.drop(columns="citoglipton") # Only one value (NO)
-# train_data = train_data.drop(columns="patient_nbr") #irrelevant
+
+#--------------------------------------------------------------------------------------------------------------
+# 1.2 Handle IDS_Mapping file
+
+# Load the mapping file
+mapping = pd.read_csv('IDS_mapping.csv')
+
+# admission_type_id IMPORTANT 9
+#admission_type_id:
+# (Since the file is stacked, you might want to manually extract sections or just refer to it)
+# print(mapping.iloc[0:8])
+
+#Needs to be handled separate?
+# discharge_disposition_id IMPORTANT 8
+# print(mapping.iloc[10:40])
+
+# Define your groupings in a clear dictionary
+# Grouping for admission_type_id
+admission_type_groups = {
+    'Emergency': [1, 7],
+    'Urgent': [2],
+    'Elective': [3],
+    'Newborn': [4],
+    'Unknown': [5, 6, 8]
+}
+
+# Grouping for discharge_disposition_id
+discharge_groups = {
+    'Home': [1, 6, 8],
+    'Expired': [11, 19, 20, 21],
+    'Transferred': [2, 3, 4, 5, 10, 12, 13, 14, 15, 16, 17, 22, 23, 24, 27, 28, 29, 30],
+    'Unknown': [18, 25, 26]
+}
+
+# Grouping for admission_source_id
+admission_source_groups = {
+    'Referral': [1, 2, 3],
+    'Transfer': [4, 5, 6, 10, 18, 19, 22, 25, 26],
+    'Emergency': [7],
+    'Birth': [11, 12, 13, 14, 23, 24],
+    'Unknown': [9, 15, 17, 20, 21],
+    'Other': [8]
+}
+
+
+train_data['admission_type'] = apply_grouped_mapping(train_data, 'admission_type_id', admission_type_groups)
+train_data['discharge_disposition'] = apply_grouped_mapping(train_data, 'discharge_disposition_id', discharge_groups)
+train_data['admission_source'] = apply_grouped_mapping(train_data, 'admission_source_id', admission_source_groups)
 
 #----------------------------------------------------------------------------------------------------
-# 1.2 Remap Str-Features into numbers
-train_data["race"] = train_data["race"].replace('?', 'Other')
+# 1.3 Remap Str-Features into numbers
+train_data["race"] = train_data["race"].replace('?', 'Caucasian') #put together NaNs with Caucasian? most common (only 2% of values were missing) 
 
 train_data["age"] = train_data["age"].map({
     '[0-10)': 0,
@@ -196,87 +253,25 @@ train_data["diabetesMed"] = train_data["diabetesMed"].map({
 
 #One-hot
 encoder = OneHotEncoder()
-race_dummies = pd.get_dummies(train_data['race'], drop_first=True)
-gender_dummies = pd.get_dummies(train_data['gender'])
-diag1_dummies = pd.get_dummies(train_data['diag_1'], prefix='diag1')
-diag2_dummies = pd.get_dummies(train_data['diag_2'], prefix='diag2')
-diag3_dummies = pd.get_dummies(train_data['diag_3'], prefix='diag3')
-metformin_dummies = pd.get_dummies(train_data['metformin'], prefix='metformin')
-repaglinide_dummies = pd.get_dummies(train_data['repaglinide'], prefix='repaglinide')
-nateglinide_dummies = pd.get_dummies(train_data['nateglinide'], prefix='nateglinide')
-chlorpropamide_dummies = pd.get_dummies(train_data['chlorpropamide'], prefix='chlorpropamide')
-glimepiride_dummies = pd.get_dummies(train_data['glimepiride'], prefix='glimepiride')
-glipizide_dummies = pd.get_dummies(train_data['glipizide'], prefix='glipizide')
-glyburide_dummies = pd.get_dummies(train_data['glyburide'], prefix='glyburide')
-pioglitazone_dummies = pd.get_dummies(train_data['pioglitazone'], prefix='pioglitazone')
-rosiglitazone_dummies = pd.get_dummies(train_data['rosiglitazone'], prefix='rosiglitazone')
-acarbose_dummies = pd.get_dummies(train_data['acarbose'], prefix='acarbose')
-miglitol_dummies = pd.get_dummies(train_data, columns=['miglitol'], prefix='miglitol')
-insulin_dummies = pd.get_dummies(train_data['insulin'], prefix='insulin')
-glyburide_dummies = pd.get_dummies(train_data['glyburide-metformin'], prefix='glyburide')
-max_glu_serum_dummies = pd.get_dummies(train_data['max_glu_serum'], prefix='max_glu_serum')
-A1Cresult_dummies = pd.get_dummies(train_data['A1Cresult'], prefix='A1Cresult')
+# 1. Define all columns that should be turned into binary 0s and 1s
+# Note: I removed the diag columns to prevent a crash—group them first!
+nominal_cols = [
+    'race', 'gender', 'metformin', 'repaglinide', 'nateglinide', 
+    'chlorpropamide', 'glimepiride', 'glipizide', 'glyburide', 
+    'pioglitazone', 'rosiglitazone', 'acarbose', 'miglitol', 
+    'insulin', 'glyburide-metformin', 'max_glu_serum', 'A1Cresult',
+    'admission_type', 'discharge_disposition', 'admission_source'
+]
 
+# 2. Run ONE command for the whole dataset
+# This replaces all the lines in your snippet
+train_data = pd.get_dummies(train_data, columns=nominal_cols, drop_first=True)
 
-#--------------------------------------------------------------------------------------------------------------
-# 1.3 Handle IDS_Mapping file
+# 3. Handle the 'diag' columns separately (optional: just drop them for now)
+train_data = train_data.drop(columns=['diag_1', 'diag_2', 'diag_3'])
 
-# Load the mapping file
-mapping = pd.read_csv('IDS_mapping.csv')
+csv_file_path = 'fixed_diabetes.csv'
 
+train_data.to_csv(csv_file_path, index=False)
 
-# admission_type_id IMPORTANT 9
-#admission_type_id:
-# (Since the file is stacked, you might want to manually extract sections or just refer to it)
-# print(mapping.iloc[0:8])
-train_data["discharge_disposition_id"] = train_data["discharge_disposition_id"].map({
-    1: 1,
-    2: 2,
-    3: 3,
-    4: 4,
-    7: 5,
-    5: 6,
-    6: 7, #Group together: NaN & Not Mapped ?
-    8: 7
-})
-
-#Needs to be handled separate?
-# discharge_disposition_id IMPORTANT 8
-print(mapping.iloc[10:40])
-# train_data["discharge_disposition_id"].map({
-#     1: 1,#discharged to home,
-#     2: 2, #Discharged/transferred to another short term
-#     3: 3,
-#     4: 4,
-#     5: 5,
-#     6: 6,
-#     7: 7,
-#     8:8,
-#     9:9,
-#     10:10,
-#     11:11,
-#     12:12,
-#     13:13,
-#     14:14,
-#     15:15,
-#     16:16,
-#     17:17,
-#     18:18, NaN
-#     19:19, Expired
-#     20:20, Expired
-#     21:21, Expired
-
-
-# })
-
-# admission_source_id
-# print(mapping.iloc[42:67])
-#--------------------------------------------------------------------------------------------------------------
-#1.4 Reduce Dimensions PCA
-
-#2. Create models
-
-#3. plot and compare results
-
-
-# print_uniq_val(train_data, train_data.keys())
+print(f'CSV file &quot;{csv_file_path}&quot; has been created successfully.')
