@@ -7,6 +7,11 @@ import seaborn as sns
 from sklearn.preprocessing import OneHotEncoder
 import csv
 
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import confusion_matrix, classification_report
+
 #Colors used in plots and other stuff!
 class c:
     PURPLE = '\033[95m'
@@ -267,11 +272,14 @@ nominal_cols = [
 # This replaces all the lines in your snippet
 train_data = pd.get_dummies(train_data, columns=nominal_cols, drop_first=True)
 
-# 3. Handle the 'diag' columns separately (optional: just drop them for now)
-train_data = train_data.drop(columns=['diag_1', 'diag_2', 'diag_3'])
-
 csv_file_path = 'fixed_diabetes.csv'
 
 train_data.to_csv(csv_file_path, index=False)
 
 print(f'CSV file &quot;{csv_file_path}&quot; has been created successfully.')
+
+
+#--------------------------------------------------------------------------------
+#1.4 PCA
+
+# train_data.head()
