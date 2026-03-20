@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression as lr
+from sklearn.ensemble import RandomForestClassifier
 import seaborn as sns
 from sklearn.preprocessing import OneHotEncoder
 import csv
@@ -123,7 +124,7 @@ keys = data.keys()
     # metformin-pioglitazone STR ['No', 'Steady'] HANDLED MAP
     # glipizide-metformin STR ['No', 'Steady'] #HANDLED MAP
 
-    #ORDINAL -----------
+    #ORDINAL ----------- 
     # age STR IMPORTANT 4 [ '[60-70)',  '[70-80)',  '[50-60)',  '[80-90)',  '[40-50)',  '[20-30)', '[30-40)',  '[10-20)', '[90-100)',   '[0-10)'] MAP HANDLED 
     # readmitted STR ['No', '>30', '<30']  MAP HANDLED
     
@@ -170,7 +171,7 @@ data = data.drop(columns="encounter_id") #irrelevant
 data = data.drop(columns="examide") # Only one value (NO)
 data = data.drop(columns="troglitazone") # Only one value (NO)
 data = data.drop(columns="citoglipton") # Only one value (NO)
-data = data.drop(columns="diag_1") # String values, too high cardinality
+data = data.drop(columns="diag_1") # String values, too high cardinality  example. 456 - 600 heart_disease
 data = data.drop(columns="diag_2") # String values, too high cardinality
 data = data.drop(columns="diag_3") # String values, too high cardinality
 
@@ -245,10 +246,11 @@ data["metformin-rosiglitazone"] = data["metformin-rosiglitazone"].map({
     'No':0,
     'Steady':1
 })
-# data["glipizide-metformin"] = data["metformin-rosiglitazone"].map({
-#     'No':0,
-#     'Steady':1
-# })
+data["glipizide-metformin"] = data["glipizide-metformin"].map({
+    'No':0,
+    'Steady':1
+})
+
 data["tolbutamide"] = data["tolbutamide"].map({
     'No':0,
     'Steady':1
@@ -285,17 +287,47 @@ nominal_cols = [
 data = pd.get_dummies(data, columns=nominal_cols, drop_first=True)
 
 #--------------------------------------------------------------------------------
-#1.4 PCA
+#1.4 PCA 
+#https://www.geeksforgeeks.org/machine-learning/implementing-pca-in-python-with-scikit-learn/
+# nan_features, string_features = checkdata(data)
+# print(f"features that still have str: {string_features}")
+X = data.drop('readmitted', axis = 1)
+y = data['readmitted']
+    
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
 
-nan_features, string_features = checkdata(data)
+pca = PCA(n_components=50)
+X_pca = pca.fit_transform(X_scaled)
+#
+X_train, X_test, y_train, y_test = train_test_split(X_pca, y, test_size=0.3, random_state=42)
+#
+model = LogisticRegression(max_iter=1000, class_weight='balanced')
+#model = RandomForestClassifier(n_estimators=500, random_state=42, class_weight='balanced')
+model.fit(X_train, y_train)
 
-print(f"features that still have str: {string_features}")
-# data.info()
-# print(data.isnull().sum())
+y_pred = model.predict(X_test)
+
+print(y_pred.shape[0])
+cm = confusion_matrix(y_test, y_pred)
+
+plt.figure(figsize=(5,4))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',     xticklabels=['No', '<30', '>30'], yticklabels=['No', '<30', '>30'])
+plt.xlabel('Predicted Label')
+plt.ylabel('True Label')
+plt.title('Confusion Matrix')
+plt.show()
 
 
-
-
+#HÄR ÄR KODEN SOM FELIX HAR SOM BESKRIVER -----------
+#print("PCA börjar nu")
+#X_scaled = StandardScaler().fit_transform(X_train)
+#pca = PCA(n_components=10)
+#X_transformed = pca.fit_transform(X_scaled)
+#eigenvalues = pca.explained_variance_
+#
+#plt.plot(eigenvalues)
+#plt.show()
 
 #-------------------------------------------------------------------------------
 #1.5 Send to new file! FIXED DIABETES should be ready to train ml algorithms on!
