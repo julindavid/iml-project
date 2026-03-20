@@ -1,12 +1,14 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedKFold, train_test_split
 from sklearn.linear_model import LinearRegression as lr
 from sklearn.ensemble import RandomForestClassifier
 import seaborn as sns
 from sklearn.preprocessing import OneHotEncoder
 import csv
+from sklearn.model_selection import KFold, cross_val_score
+from sklearn.svm import SVC
 
 from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import StandardScaler
@@ -302,12 +304,42 @@ y = data['readmitted']
 # X_pca = pca.fit_transform(X_scaled)
 
 # X_train, X_test, y_train, y_test = train_test_split(X_pca, y, test_size=0.3, random_state=42)
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=13)
 
+model = RandomForestClassifier(
+    n_estimators=500,
+    random_state=42,
+    class_weight='balanced'
+)
+
+cv_scores_acc = cross_val_score(
+    model,
+    X,
+    y,
+    cv=cv,
+    scoring='accuracy'
+)
+
+cv_scores_f1 = cross_val_score(
+    model,
+    X,
+    y,
+    cv=cv,
+    scoring='f1_macro'
+)
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=13)
 
+model = RandomForestClassifier(
+    n_estimators=500,
+    random_state=42,
+    class_weight='balanced'
+)
 # model = LogisticRegression(max_iter=1000, class_weight='balanced')
-model = RandomForestClassifier(n_estimators=500, random_state=42, class_weight='balanced')
+#model = RandomForestClassifier(n_estimators=100, random_state=42, class_weight='balanced')
+#scores = cross_val_score(model, X, y, cv =kf, scoring="accuracy")
+# model = SVC(max_iter=1000, random_state=13)
 model.fit(X_train, y_train)
+
 
 y_pred = model.predict(X_test)
 
@@ -319,10 +351,20 @@ plt.figure(figsize=(5,4))
 sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',     xticklabels=['No', '<30', '>30'], yticklabels=['No', '<30', '>30'])
 plt.xlabel('Predicted Label')
 plt.ylabel('True Label')
-plt.title('Confusion Matrix (Random Forest)')
+plt.title('Confusion Matrix (Random Forest, PCA)')
 plt.show()
 
+#----------------------------------------
+#           Running test file
+#----------------------------------------
 
+test_df = pd.read_csv("test.csv")
+test_pred = model.predict(test_df)
+print(f"Accuracy: {accuracy_score(test_df, test_pred)}")
+
+test_pred.to_csv('kaggle_submission.csv', index=False)
+
+#----------------------------------------
 #HÄR ÄR KODEN SOM FELIX HAR SOM BESKRIVER -----------
 #print("PCA börjar nu")
 #X_scaled = StandardScaler().fit_transform(X_train)
