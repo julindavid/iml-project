@@ -54,6 +54,12 @@ def print_uniq_val(data, column_names):
         print(data[col].unique())
         print("-" * 30)
 
+def print_uniq_vals2(data, column):
+    # Iterate directly over the names (no need for range(len)
+    
+    print(data[column].unique())
+    print("-" * 30)
+
 
 def check_missing_values(data):
     """Check and print missing values in the dataset."""
@@ -74,16 +80,26 @@ def apply_grouped_mapping(df, column, grouping_dict):
     
     # Map the new names and fill any missing IDs with 'Other'
     return df[column].map(flat_map).fillna('Other')
-train_data = pd.read_csv("train.csv")
-keys = train_data.keys()
+data = pd.read_csv("train.csv")
+keys = data.keys()
 
 #helper functions, handle binary
 
 
 
 # keys found:   -----------------
-    # id
     # encounter_id REMOVED
+    # weight REMOVED
+    #examide REMOVED
+    #payer code REMOVED
+    #medical specialty REMOVED
+    #troglitazone REMOVED
+    #citoglipton REMOVED
+    #diag_1
+    #diag_2
+    #diag_3
+
+
     # patient_nbr
     # time_in_hospital IMPORTANT 3
     # num_lab_procedures IMPORTANT 1
@@ -92,9 +108,9 @@ keys = train_data.keys()
     # number_outpatient
     # number_emergency
     # number_inpatient IMPORTANT 7
-    # diag_1 STR 685st      ONE HOT HANDLED
-    # diag_2 STR 692st      ONE HOT HANDLED
-    # diag_3 STR 746st      ONE HOT HANDLED
+    # diag_1 STR 685st      str(V57)
+    # diag_2 STR 692st      
+    # diag_3 STR 746st      
     # number_diagnoses IMPORTANT 6
 
     #BINARY ------------
@@ -140,23 +156,23 @@ keys = train_data.keys()
 #1. Preprocessing of data 
 #========================================================================
 #1.1: Handle missing values from features: 
-train_data["A1Cresult"] = train_data['A1Cresult'].fillna('none')
-train_data["max_glu_serum"] = train_data['max_glu_serum'].fillna('none')
-train_data["diag_3"] = train_data["diag_3"].fillna(0)
+# print_uniq_vals2(data, "A1Cresult")
+
+data["A1Cresult"] = data['A1Cresult'].fillna('none')
+data["max_glu_serum"] = data['max_glu_serum'].fillna('none')
+data["race"] = data["race"].replace('?', 'Caucasian') #put together NaNs with Caucasian? most common (only 2% of values were missing) 
 
 #1.1 Remove features with a lot of missing values & unecessary features
-train_data = train_data.drop(columns="weight") #low amount of values
-train_data = train_data.drop(columns="payer_code") #low amount of values
-train_data = train_data.drop(columns="medical_specialty") #low amount of values
-
-
-nan_features, string_features = checkdata(train_data)
-# print(f"features that have NaN values: {nan_features}")
-# print(f"features that have string values: {string_features}")
-train_data = train_data.drop(columns="encounter_id") #irrelevant
-train_data = train_data.drop(columns="examide") # Only one value (NO)
-train_data = train_data.drop(columns="troglitazone") # Only one value (NO)
-train_data = train_data.drop(columns="citoglipton") # Only one value (NO)
+data = data.drop(columns="weight") #low amount of values
+data = data.drop(columns="payer_code") #low amount of values
+data = data.drop(columns="medical_specialty") #low amount of values
+data = data.drop(columns="encounter_id") #irrelevant
+data = data.drop(columns="examide") # Only one value (NO)
+data = data.drop(columns="troglitazone") # Only one value (NO)
+data = data.drop(columns="citoglipton") # Only one value (NO)
+data = data.drop(columns="diag_1") # String values, too high cardinality
+data = data.drop(columns="diag_2") # String values, too high cardinality
+data = data.drop(columns="diag_3") # String values, too high cardinality
 
 #--------------------------------------------------------------------------------------------------------------
 # 1.2 Handle IDS_Mapping file
@@ -164,17 +180,6 @@ train_data = train_data.drop(columns="citoglipton") # Only one value (NO)
 # Load the mapping file
 mapping = pd.read_csv('IDS_mapping.csv')
 
-# admission_type_id IMPORTANT 9
-#admission_type_id:
-# (Since the file is stacked, you might want to manually extract sections or just refer to it)
-# print(mapping.iloc[0:8])
-
-#Needs to be handled separate?
-# discharge_disposition_id IMPORTANT 8
-# print(mapping.iloc[10:40])
-
-# Define your groupings in a clear dictionary
-# Grouping for admission_type_id
 admission_type_groups = {
     'Emergency': [1, 7],
     'Urgent': [2],
@@ -201,16 +206,14 @@ admission_source_groups = {
     'Other': [8]
 }
 
-
-train_data['admission_type'] = apply_grouped_mapping(train_data, 'admission_type_id', admission_type_groups)
-train_data['discharge_disposition'] = apply_grouped_mapping(train_data, 'discharge_disposition_id', discharge_groups)
-train_data['admission_source'] = apply_grouped_mapping(train_data, 'admission_source_id', admission_source_groups)
+data['admission_type'] = apply_grouped_mapping(data, 'admission_type_id', admission_type_groups)
+data['discharge_disposition'] = apply_grouped_mapping(data, 'discharge_disposition_id', discharge_groups)
+data['admission_source'] = apply_grouped_mapping(data, 'admission_source_id', admission_source_groups)
 
 #----------------------------------------------------------------------------------------------------
 # 1.3 Remap Str-Features into numbers
-train_data["race"] = train_data["race"].replace('?', 'Caucasian') #put together NaNs with Caucasian? most common (only 2% of values were missing) 
 
-train_data["age"] = train_data["age"].map({
+data["age"] = data["age"].map({
     '[0-10)': 0,
     '[10-20)': 1,
     '[20-30)': 2,
@@ -221,36 +224,45 @@ train_data["age"] = train_data["age"].map({
     '[70-80)': 7,
     '[80-90)': 8,
     '[90-100)': 9})
-train_data["readmitted"] = train_data["readmitted"].map({
+data["readmitted"] = data["readmitted"].map({
     'No': 0,
     '<30': 1,
     '>30': 2
 })
-train_data["acetohexamide"] = train_data["acetohexamide"].map({
+data["acetohexamide"] = data["acetohexamide"].map({
     'No':0,
     'Steady':1
 })
-train_data["glimepiride-pioglitazone"] = train_data["glimepiride-pioglitazone"].map({
+data["glimepiride-pioglitazone"] = data["glimepiride-pioglitazone"].map({
     'No':0,
     'Steady':1
 })
-train_data["metformin-pioglitazone"] = train_data["metformin-pioglitazone"].map({
+data["metformin-pioglitazone"] = data["metformin-pioglitazone"].map({
     'No':0,
     'Steady':1
 })
-train_data["metformin-rosiglitazone"] = train_data["metformin-rosiglitazone"].map({
+data["metformin-rosiglitazone"] = data["metformin-rosiglitazone"].map({
     'No':0,
     'Steady':1
 })
-train_data["tolbutamide"] = train_data["tolbutamide"].map({
+# data["glipizide-metformin"] = data["metformin-rosiglitazone"].map({
+#     'No':0,
+#     'Steady':1
+# })
+data["tolbutamide"] = data["tolbutamide"].map({
     'No':0,
     'Steady':1
 })
-train_data["change"] = train_data["change"].map({
+data["tolazamide"] = data["tolazamide"].map({
+    'No':0,
+    'Steady':1,
+    'Up':2
+})
+data["change"] = data["change"].map({
     'Ch':1,
     'No':0
 })
-train_data["diabetesMed"] = train_data["diabetesMed"].map({
+data["diabetesMed"] = data["diabetesMed"].map({
     'Yes':1,
     'No':0
 })
@@ -270,15 +282,27 @@ nominal_cols = [
 
 # 2. Run ONE command for the whole dataset
 # This replaces all the lines in your snippet
-train_data = pd.get_dummies(train_data, columns=nominal_cols, drop_first=True)
-
-csv_file_path = 'fixed_diabetes.csv'
-
-train_data.to_csv(csv_file_path, index=False)
-
-print(f'CSV file &quot;{csv_file_path}&quot; has been created successfully.')
-
+data = pd.get_dummies(data, columns=nominal_cols, drop_first=True)
 
 #--------------------------------------------------------------------------------
 #1.4 PCA
+
+nan_features, string_features = checkdata(data)
+
+print(f"features that still have str: {string_features}")
+# data.info()
+# print(data.isnull().sum())
+
+
+
+
+
+#-------------------------------------------------------------------------------
+#1.5 Send to new file! FIXED DIABETES should be ready to train ml algorithms on!
+csv_file_path = 'fixed_diabetes.csv'
+
+# data.to_csv(csv_file_path, index=False)
+
+# print(f'CSV file &quot;{csv_file_path}&quot; has been created successfully.')
+
 
