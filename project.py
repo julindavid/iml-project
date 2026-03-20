@@ -217,6 +217,7 @@ data['admission_source'] = apply_grouped_mapping(data, 'admission_source_id', ad
 #----------------------------------------------------------------------------------------------------
 # 1.3 Remap Str-Features into numbers
 
+#Ordinal ------------------------------------------------------------------
 data["age"] = data["age"].map({
     '[0-10)': 0,
     '[10-20)': 1,
@@ -233,6 +234,12 @@ data["readmitted"] = data["readmitted"].map({
     '<30': 1,
     '>30': 2
 })
+data["tolazamide"] = data["tolazamide"].map({
+    'No':0,
+    'Steady':1,
+    'Up':2
+})
+#Binary ---------------------------------------------------------------------
 data["acetohexamide"] = data["acetohexamide"].map({
     'No':0,
     'Steady':1
@@ -257,11 +264,6 @@ data["glipizide-metformin"] = data["glipizide-metformin"].map({
 data["tolbutamide"] = data["tolbutamide"].map({
     'No':0,
     'Steady':1
-})
-data["tolazamide"] = data["tolazamide"].map({
-    'No':0,
-    'Steady':1,
-    'Up':2
 })
 data["change"] = data["change"].map({
     'Ch':1,
