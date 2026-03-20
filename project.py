@@ -8,6 +8,7 @@ import seaborn as sns
 from sklearn.preprocessing import OneHotEncoder
 import csv
 
+from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LogisticRegression
@@ -294,16 +295,18 @@ data = pd.get_dummies(data, columns=nominal_cols, drop_first=True)
 X = data.drop('readmitted', axis = 1)
 y = data['readmitted']
     
-scaler = StandardScaler()
-X_scaled = scaler.fit_transform(X)
+# scaler = StandardScaler()
+# X_scaled = scaler.fit_transform(X)
 
-pca = PCA(n_components=50)
-X_pca = pca.fit_transform(X_scaled)
-#
-X_train, X_test, y_train, y_test = train_test_split(X_pca, y, test_size=0.3, random_state=42)
-#
-model = LogisticRegression(max_iter=1000, class_weight='balanced')
-#model = RandomForestClassifier(n_estimators=500, random_state=42, class_weight='balanced')
+# pca = PCA(n_components=50)
+# X_pca = pca.fit_transform(X_scaled)
+
+# X_train, X_test, y_train, y_test = train_test_split(X_pca, y, test_size=0.3, random_state=42)
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=13)
+
+# model = LogisticRegression(max_iter=1000, class_weight='balanced')
+model = RandomForestClassifier(n_estimators=500, random_state=42, class_weight='balanced')
 model.fit(X_train, y_train)
 
 y_pred = model.predict(X_test)
@@ -311,11 +314,12 @@ y_pred = model.predict(X_test)
 print(y_pred.shape[0])
 cm = confusion_matrix(y_test, y_pred)
 
+print(f"Accuracy: {accuracy_score(y_test, y_pred)}")
 plt.figure(figsize=(5,4))
 sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',     xticklabels=['No', '<30', '>30'], yticklabels=['No', '<30', '>30'])
 plt.xlabel('Predicted Label')
 plt.ylabel('True Label')
-plt.title('Confusion Matrix')
+plt.title('Confusion Matrix (Random Forest)')
 plt.show()
 
 
