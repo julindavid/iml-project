@@ -72,7 +72,6 @@ def check_missing_values(data):
     print(f"Total number of missing values: {c.BOLD}{nan_total}{c.END}\n")
     print(f"{c.BOLD}Printing how many entries in each column contain no NaN values{c.END}:")
 
-
 def apply_grouped_mapping(df, column, grouping_dict):
     """
     Flattens a grouping dictionary and maps it to a DataFrame column.
@@ -82,6 +81,128 @@ def apply_grouped_mapping(df, column, grouping_dict):
     
     # Map the new names and fill any missing IDs with 'Other'
     return df[column].map(flat_map).fillna('Other')
+
+def apply_preprocessing(data):
+    data["A1Cresult"] = data['A1Cresult'].fillna('none')
+    data["max_glu_serum"] = data['max_glu_serum'].fillna('none')
+    data["race"] = data["race"].replace('?', 'Caucasian') #put together NaNs with Caucasian? most common (only 2% of values were missing) 
+
+    #1.1 Remove features with a lot of missing values & unecessary features
+    data = data.drop(columns="weight") #low amount of values
+    data = data.drop(columns="payer_code") #low amount of values
+    data = data.drop(columns="medical_specialty") #low amount of values
+    data = data.drop(columns="encounter_id") #irrelevant
+    data = data.drop(columns="examide") # Only one value (NO)
+    data = data.drop(columns="troglitazone") # Only one value (NO)
+    data = data.drop(columns="citoglipton") # Only one value (NO)
+    data = data.drop(columns="diag_1") # String values, too high cardinality  example. 456 - 600 heart_disease
+    data = data.drop(columns="diag_2") # String values, too high cardinality
+    data = data.drop(columns="diag_3") # String values, too high cardinality
+
+
+    admission_type_groups = {
+    'Emergency': [1, 7],
+    'Urgent': [2],
+    'Elective': [3],
+    'Newborn': [4],
+    'Unknown': [5, 6, 8]
+    }
+
+    # Grouping for discharge_disposition_id
+    discharge_groups = {
+        'Home': [1, 6, 8],
+        'Expired': [11, 19, 20, 21],
+        'Transferred': [2, 3, 4, 5, 10, 12, 13, 14, 15, 16, 17, 22, 23, 24, 27, 28, 29, 30],
+        'Unknown': [18, 25, 26]
+    }
+
+    # Grouping for admission_source_id
+    admission_source_groups = {
+        'Referral': [1, 2, 3],
+        'Transfer': [4, 5, 6, 10, 18, 19, 22, 25, 26],
+        'Emergency': [7],
+        'Birth': [11, 12, 13, 14, 23, 24],
+        'Unknown': [9, 15, 17, 20, 21],
+        'Other': [8]
+    }
+
+    data['admission_type'] = apply_grouped_mapping(data, 'admission_type_id', admission_type_groups)
+    data['discharge_disposition'] = apply_grouped_mapping(data, 'discharge_disposition_id', discharge_groups)
+    data['admission_source'] = apply_grouped_mapping(data, 'admission_source_id', admission_source_groups)
+
+    #----------------------------------------------------------------------------------------------------
+    # 1.3 Remap Str-Features into numbers
+
+    #Ordinal ------------------------------------------------------------------
+    data["age"] = data["age"].map({
+        '[0-10)': 0,
+        '[10-20)': 1,
+        '[20-30)': 2,
+        '[30-40)': 3,
+        '[40-50)': 4,
+        '[50-60)': 5,
+        '[60-70)': 6,
+        '[70-80)': 7,
+        '[80-90)': 8,
+        '[90-100)': 9})
+    data["tolazamide"] = data["tolazamide"].map({
+        'No':0,
+        'Steady':1,
+        'Up':2
+    })
+    #Binary ---------------------------------------------------------------------
+    data["acetohexamide"] = data["acetohexamide"].map({
+        'No':0,
+        'Steady':1
+    })
+    data["glimepiride-pioglitazone"] = data["glimepiride-pioglitazone"].map({
+        'No':0,
+        'Steady':1
+    })
+    data["metformin-pioglitazone"] = data["metformin-pioglitazone"].map({
+        'No':0,
+        'Steady':1
+    })
+    data["metformin-rosiglitazone"] = data["metformin-rosiglitazone"].map({
+        'No':0,
+        'Steady':1
+    })
+    data["glipizide-metformin"] = data["glipizide-metformin"].map({
+        'No':0,
+        'Steady':1
+    })
+
+    data["tolbutamide"] = data["tolbutamide"].map({
+        'No':0,
+        'Steady':1
+    })
+    data["change"] = data["change"].map({
+        'Ch':1,
+        'No':0
+    })
+    data["diabetesMed"] = data["diabetesMed"].map({
+        'Yes':1,
+        'No':0
+    })
+    
+    #One-hot
+    encoder = OneHotEncoder()
+    # 1. Define all columns that should be turned into binary 0s and 1s
+    # Note: I removed the diag columns to prevent a crash—group them first!
+    nominal_cols = [
+        'race', 'gender', 'metformin', 'repaglinide', 'nateglinide', 
+        'chlorpropamide', 'glimepiride', 'glipizide', 'glyburide', 
+        'pioglitazone', 'rosiglitazone', 'acarbose', 'miglitol', 
+        'insulin', 'glyburide-metformin', 'max_glu_serum', 'A1Cresult',
+        'admission_type', 'discharge_disposition', 'admission_source'
+    ]
+
+    # 2. Run ONE command for the whole dataset
+    # prefix
+    data = pd.get_dummies(data, columns=nominal_cols, drop_first=True)
+    return data
+
+# -------------END OF FUNCTION
 data = pd.read_csv("train.csv")
 keys = data.keys()
 
@@ -180,7 +301,7 @@ data = data.drop(columns="diag_3") # String values, too high cardinality
 # 1.2 Handle IDS_Mapping file
 
 # Load the mapping file
-mapping = pd.read_csv('IDS_mapping.csv')
+# mapping = pd.read_csv('IDS_mapping.csv')
 
 admission_type_groups = {
     'Emergency': [1, 7],
@@ -296,7 +417,7 @@ data = pd.get_dummies(data, columns=nominal_cols, drop_first=True)
 # print(f"features that still have str: {string_features}")
 X = data.drop('readmitted', axis = 1)
 y = data['readmitted']
-    
+
 # scaler = StandardScaler()
 # X_scaled = scaler.fit_transform(X)
 
@@ -308,21 +429,22 @@ y = data['readmitted']
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=13)
 
 # model = LogisticRegression(max_iter=1000, class_weight='balanced')
-model = RandomForestClassifier(n_estimators=500, random_state=42, class_weight='balanced')
-model.fit(X_train, y_train)
+# model = RandomForestClassifier(n_estimators=500, random_state=42, class_weight='balanced')
+# model.fit(X_train, y_train)
 
-y_pred = model.predict(X_test)
+# y_pred = model.predict(X_test)
 
-print(y_pred.shape[0])
-cm = confusion_matrix(y_test, y_pred)
 
-print(f"Accuracy: {accuracy_score(y_test, y_pred)}")
-plt.figure(figsize=(5,4))
-sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',     xticklabels=['No', '<30', '>30'], yticklabels=['No', '<30', '>30'])
-plt.xlabel('Predicted Label')
-plt.ylabel('True Label')
-plt.title('Confusion Matrix (Random Forest)')
-plt.show()
+# print(y_pred.shape[0])
+# cm = confusion_matrix(y_test, y_pred)
+
+# print(f"Accuracy: {accuracy_score(y_test, y_pred)}")
+# plt.figure(figsize=(5,4))
+# sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',     xticklabels=['No', '<30', '>30'], yticklabels=['No', '<30', '>30'])
+# plt.xlabel('Predicted Label')
+# plt.ylabel('True Label')
+# plt.title('Confusion Matrix (Random Forest)')
+# plt.show()
 
 
 #HÄR ÄR KODEN SOM FELIX HAR SOM BESKRIVER -----------
@@ -339,8 +461,8 @@ plt.show()
 #1.5 Send to new file! FIXED DIABETES should be ready to train ml algorithms on!
 csv_file_path = 'fixed_diabetes.csv'
 
-# data.to_csv(csv_file_path, index=False)
+data.to_csv(csv_file_path, index=False)
 
-# print(f'CSV file &quot;{csv_file_path}&quot; has been created successfully.')
+print(f'CSV file &quot;{csv_file_path}&quot; has been created successfully.')
 
 
