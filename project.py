@@ -59,7 +59,6 @@ def print_uniq_val(data, column_names):
         print("-" * 30)
 
 def print_uniq_vals2(data, column):
-    # Iterate directly over the names (no need for range(len)
     
     print(data[column].unique())
     print("-" * 30)
@@ -84,24 +83,23 @@ def apply_grouped_mapping(df, column, grouping_dict):
     # Map the new names and fill any missing IDs with 'Other'
     return df[column].map(flat_map).fillna('Other')
 
-def apply_preprocessing(data):
-    data["A1Cresult"] = data['A1Cresult'].fillna('none')
-    data["max_glu_serum"] = data['max_glu_serum'].fillna('none')
-    data["race"] = data["race"].replace('?', 'Caucasian') #put together NaNs with Caucasian? most common (only 2% of values were missing) 
 
-    #1.1 Remove features with a lot of missing values & unecessary features
-    data = data.drop(columns="weight") #low amount of values
-    data = data.drop(columns="payer_code") #low amount of values
-    data = data.drop(columns="medical_specialty") #low amount of values
-    data = data.drop(columns="encounter_id") #irrelevant
-    data = data.drop(columns="examide") # Only one value (NO)
-    data = data.drop(columns="troglitazone") # Only one value (NO)
-    data = data.drop(columns="citoglipton") # Only one value (NO)
-    data = data.drop(columns="diag_1") # String values, too high cardinality  example. 456 - 600 heart_disease
-    data = data.drop(columns="diag_2") # String values, too high cardinality
-    data = data.drop(columns="diag_3") # String values, too high cardinality
+def fillempty(data):
+    filled_data = data
+    filled_data["A1Cresult"] = data['A1Cresult'].fillna('none')
+    filled_data["max_glu_serum"] = data['max_glu_serum'].fillna('none')
+    filled_data["race"] = data["race"].replace('?', 'Caucasian') #put together NaNs with Caucasian? most common (only 2% of values were missing)
+    return filled_data
 
 
+def drop_columns(data):
+    return data.drop(columns=[
+        "weight", "payer_code", "medical_specialty",
+        "encounter_id", "examide", "troglitazone",
+        "citoglipton", "diag_1", "diag_2", "diag_3"
+    ])
+
+def ids_mapping(data):
     admission_type_groups = {
     'Emergency': [1, 7],
     'Urgent': [2],
@@ -127,16 +125,16 @@ def apply_preprocessing(data):
         'Unknown': [9, 15, 17, 20, 21],
         'Other': [8]
     }
+    fixed_data = data
+    fixed_data['admission_type'] = apply_grouped_mapping(data, 'admission_type_id', admission_type_groups)
+    fixed_data['discharge_disposition'] = apply_grouped_mapping(data, 'discharge_disposition_id', discharge_groups)
+    fixed_data['admission_source'] = apply_grouped_mapping(data, 'admission_source_id', admission_source_groups)
+    return fixed_data
 
-    data['admission_type'] = apply_grouped_mapping(data, 'admission_type_id', admission_type_groups)
-    data['discharge_disposition'] = apply_grouped_mapping(data, 'discharge_disposition_id', discharge_groups)
-    data['admission_source'] = apply_grouped_mapping(data, 'admission_source_id', admission_source_groups)
 
-    #----------------------------------------------------------------------------------------------------
-    # 1.3 Remap Str-Features into numbers
-
-    #Ordinal ------------------------------------------------------------------
-    data["age"] = data["age"].map({
+def map_data(data):
+    mapped_data = data
+    mapped_data["age"] = data["age"].map({
         '[0-10)': 0,
         '[10-20)': 1,
         '[20-30)': 2,
@@ -147,46 +145,48 @@ def apply_preprocessing(data):
         '[70-80)': 7,
         '[80-90)': 8,
         '[90-100)': 9})
-    data["tolazamide"] = data["tolazamide"].map({
+    mapped_data["tolazamide"] = data["tolazamide"].map({
         'No':0,
         'Steady':1,
         'Up':2
     })
     #Binary ---------------------------------------------------------------------
-    data["acetohexamide"] = data["acetohexamide"].map({
+    mapped_data["acetohexamide"] = data["acetohexamide"].map({
         'No':0,
         'Steady':1
     })
-    data["glimepiride-pioglitazone"] = data["glimepiride-pioglitazone"].map({
+    mapped_data["glimepiride-pioglitazone"] = data["glimepiride-pioglitazone"].map({
         'No':0,
         'Steady':1
     })
-    data["metformin-pioglitazone"] = data["metformin-pioglitazone"].map({
+    mapped_data["metformin-pioglitazone"] = data["metformin-pioglitazone"].map({
         'No':0,
         'Steady':1
     })
-    data["metformin-rosiglitazone"] = data["metformin-rosiglitazone"].map({
+    mapped_data["metformin-rosiglitazone"] = data["metformin-rosiglitazone"].map({
         'No':0,
         'Steady':1
     })
-    data["glipizide-metformin"] = data["glipizide-metformin"].map({
+    mapped_data["glipizide-metformin"] = data["glipizide-metformin"].map({
         'No':0,
         'Steady':1
     })
 
-    data["tolbutamide"] = data["tolbutamide"].map({
+    mapped_data["tolbutamide"] = data["tolbutamide"].map({
         'No':0,
         'Steady':1
     })
-    data["change"] = data["change"].map({
+    mapped_data["change"] = data["change"].map({
         'Ch':1,
         'No':0
     })
-    data["diabetesMed"] = data["diabetesMed"].map({
+    mapped_data["diabetesMed"] = data["diabetesMed"].map({
         'Yes':1,
         'No':0
     })
-    
+    return mapped_data
+
+def onehot(data):
     #One-hot
     encoder = OneHotEncoder()
     # 1. Define all columns that should be turned into binary 0s and 1s
@@ -201,8 +201,28 @@ def apply_preprocessing(data):
 
     # 2. Run ONE command for the whole dataset
     # prefix
-    data = pd.get_dummies(data, columns=nominal_cols, drop_first=True)
-    return data
+    fixed_data = pd.get_dummies(data, columns=nominal_cols, drop_first=True)
+    return fixed_data
+
+def fix_label(data):
+    mapped_data = data
+    mapped_data["readmitted"] = data["readmitted"].map({
+            'No': 0,
+            '<30': 1,
+            '>30': 2
+        })
+    return mapped_data
+
+def apply_preprocessing(data):
+    """takes diabetes data set and preprocesses it"""
+    fixed_data = fillempty(data)
+    fixed_data = drop_columns(fixed_data)
+    fixed_data = ids_mapping(fixed_data)
+    fixed_data = map_data(fixed_data)
+    fixed_data = onehot(fixed_data)
+
+    return fixed_data
+
 
 # -------------END OF FUNCTION
 data = pd.read_csv("train.csv")
@@ -226,17 +246,17 @@ keys = data.keys()
 
 
     # patient_nbr
-    # time_in_hospital IMPORTANT 3
-    # num_lab_procedures IMPORTANT 1
-    # num_procedures IMPORTANT 5
-    # num_medications IMPORTANT 2
+    # time_in_hospital 
+    # num_lab_procedures 
+    # num_procedures 
+    # num_medications 
     # number_outpatient
     # number_emergency
-    # number_inpatient IMPORTANT 7
-    # diag_1 STR 685st      str(V57)
-    # diag_2 STR 692st      
-    # diag_3 STR 746st      
-    # number_diagnoses IMPORTANT 6
+    # number_inpatient 
+    # diag_1 STR 685st      str(V57) REMOVED
+    # diag_2 STR 692st      REMOVED 
+    # diag_3 STR 746st      REMOVED
+    # number_diagnoses 
 
     #BINARY ------------
     # acetohexamide STR ['No', 'Steady'] HANDLED MAP
@@ -277,231 +297,65 @@ keys = data.keys()
 
 #https://www.geeksforgeeks.org/data-analysis/data-preprocessing-machine-learning-python/
 
-#========================================================================
-#1. Preprocessing of data 
-#========================================================================
-#1.1: Handle missing values from features: 
-# print_uniq_vals2(data, "A1Cresult")
-
-data["A1Cresult"] = data['A1Cresult'].fillna('none')
-data["max_glu_serum"] = data['max_glu_serum'].fillna('none')
-data["race"] = data["race"].replace('?', 'Caucasian') #put together NaNs with Caucasian? most common (only 2% of values were missing) 
-
-#1.1 Remove features with a lot of missing values & unecessary features
-data = data.drop(columns="weight") #low amount of values
-data = data.drop(columns="payer_code") #low amount of values
-data = data.drop(columns="medical_specialty") #low amount of values
-data = data.drop(columns="encounter_id") #irrelevant
-data = data.drop(columns="examide") # Only one value (NO)
-data = data.drop(columns="troglitazone") # Only one value (NO)
-data = data.drop(columns="citoglipton") # Only one value (NO)
-data = data.drop(columns="diag_1") # String values, too high cardinality  example. 456 - 600 heart_disease
-data = data.drop(columns="diag_2") # String values, too high cardinality
-data = data.drop(columns="diag_3") # String values, too high cardinality
-
-#--------------------------------------------------------------------------------------------------------------
-# 1.2 Handle IDS_Mapping file
-
-# Load the mapping file
-# mapping = pd.read_csv('IDS_mapping.csv')
-
-admission_type_groups = {
-    'Emergency': [1, 7],
-    'Urgent': [2],
-    'Elective': [3],
-    'Newborn': [4],
-    'Unknown': [5, 6, 8]
-}
-
-# Grouping for discharge_disposition_id
-discharge_groups = {
-    'Home': [1, 6, 8],
-    'Expired': [11, 19, 20, 21],
-    'Transferred': [2, 3, 4, 5, 10, 12, 13, 14, 15, 16, 17, 22, 23, 24, 27, 28, 29, 30],
-    'Unknown': [18, 25, 26]
-}
-
-# Grouping for admission_source_id
-admission_source_groups = {
-    'Referral': [1, 2, 3],
-    'Transfer': [4, 5, 6, 10, 18, 19, 22, 25, 26],
-    'Emergency': [7],
-    'Birth': [11, 12, 13, 14, 23, 24],
-    'Unknown': [9, 15, 17, 20, 21],
-    'Other': [8]
-}
-
-data['admission_type'] = apply_grouped_mapping(data, 'admission_type_id', admission_type_groups)
-data['discharge_disposition'] = apply_grouped_mapping(data, 'discharge_disposition_id', discharge_groups)
-data['admission_source'] = apply_grouped_mapping(data, 'admission_source_id', admission_source_groups)
-
-#----------------------------------------------------------------------------------------------------
-# 1.3 Remap Str-Features into numbers
-
-#Ordinal ------------------------------------------------------------------
-data["age"] = data["age"].map({
-    '[0-10)': 0,
-    '[10-20)': 1,
-    '[20-30)': 2,
-    '[30-40)': 3,
-    '[40-50)': 4,
-    '[50-60)': 5,
-    '[60-70)': 6,
-    '[70-80)': 7,
-    '[80-90)': 8,
-    '[90-100)': 9})
-data["readmitted"] = data["readmitted"].map({
-    'No': 0,
-    '<30': 1,
-    '>30': 2
-})
-data["tolazamide"] = data["tolazamide"].map({
-    'No':0,
-    'Steady':1,
-    'Up':2
-})
-#Binary ---------------------------------------------------------------------
-data["acetohexamide"] = data["acetohexamide"].map({
-    'No':0,
-    'Steady':1
-})
-data["glimepiride-pioglitazone"] = data["glimepiride-pioglitazone"].map({
-    'No':0,
-    'Steady':1
-})
-data["metformin-pioglitazone"] = data["metformin-pioglitazone"].map({
-    'No':0,
-    'Steady':1
-})
-data["metformin-rosiglitazone"] = data["metformin-rosiglitazone"].map({
-    'No':0,
-    'Steady':1
-})
-data["glipizide-metformin"] = data["glipizide-metformin"].map({
-    'No':0,
-    'Steady':1
-})
-
-data["tolbutamide"] = data["tolbutamide"].map({
-    'No':0,
-    'Steady':1
-})
-data["change"] = data["change"].map({
-    'Ch':1,
-    'No':0
-})
-data["diabetesMed"] = data["diabetesMed"].map({
-    'Yes':1,
-    'No':0
-})
 
 
-#One-hot
-encoder = OneHotEncoder()
-# 1. Define all columns that should be turned into binary 0s and 1s
-# Note: I removed the diag columns to prevent a crash—group them first!
-nominal_cols = [
-    'race', 'gender', 'metformin', 'repaglinide', 'nateglinide', 
-    'chlorpropamide', 'glimepiride', 'glipizide', 'glyburide', 
-    'pioglitazone', 'rosiglitazone', 'acarbose', 'miglitol', 
-    'insulin', 'glyburide-metformin', 'max_glu_serum', 'A1Cresult',
-    'admission_type', 'discharge_disposition', 'admission_source'
-]
+# #--------------------------------------------------------------------------------
+# #1.4 PCA 
+# #https://www.geeksforgeeks.org/machine-learning/implementing-pca-in-python-with-scikit-learn/
+# # nan_features, string_features = checkdata(data)
+# # print(f"features that still have str: {string_features}")
+# X = data.drop('readmitted', axis = 1)
+# y = data['readmitted']
 
-# 2. Run ONE command for the whole dataset
-# This replaces all the lines in your snippet
-data = pd.get_dummies(data, columns=nominal_cols, drop_first=True)
+# # scaler = StandardScaler()
+# # X_scaled = scaler.fit_transform(X)
 
-#--------------------------------------------------------------------------------
-#1.4 PCA 
-#https://www.geeksforgeeks.org/machine-learning/implementing-pca-in-python-with-scikit-learn/
-# nan_features, string_features = checkdata(data)
-# print(f"features that still have str: {string_features}")
-X = data.drop('readmitted', axis = 1)
-y = data['readmitted']
-
-# scaler = StandardScaler()
-# X_scaled = scaler.fit_transform(X)
-
-# pca = PCA(n_components=50)
-# X_pca = pca.fit_transform(X_scaled)
-
-# X_train, X_test, y_train, y_test = train_test_split(X_pca, y, test_size=0.3, random_state=42)
-cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=13)
-
-model = RandomForestClassifier(
-    n_estimators=500,
-    random_state=42,
-    class_weight='balanced'
-)
-
-cv_scores_acc = cross_val_score(
-    model,
-    X,
-    y,
-    cv=cv,
-    scoring='accuracy'
-)
-
-cv_scores_f1 = cross_val_score(
-    model,
-    X,
-    y,
-    cv=cv,
-    scoring='f1_macro'
-)
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=13)
-
-model = RandomForestClassifier(
-    n_estimators=500,
-    random_state=42,
-    class_weight='balanced'
-)
-# model = LogisticRegression(max_iter=1000, class_weight='balanced')
-# model = RandomForestClassifier(n_estimators=500, random_state=42, class_weight='balanced')
-# model.fit(X_train, y_train)
-
-# y_pred = model.predict(X_test)
+# # pca = PCA(n_components=50)
+# # X_pca = pca.fit_transform(X_scaled)
 
 
-# print(y_pred.shape[0])
-# cm = confusion_matrix(y_test, y_pred)
+# #-------------------------------------------------------------------------------
+# #1.5 Send to new file! FIXED DIABETES should be ready to train ml algorithms on!
+# csv_file_path = 'fixed_diabetes.csv'
 
-# print(f"Accuracy: {accuracy_score(y_test, y_pred)}")
-# plt.figure(figsize=(5,4))
-# sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',     xticklabels=['No', '<30', '>30'], yticklabels=['No', '<30', '>30'])
-# plt.xlabel('Predicted Label')
-# plt.ylabel('True Label')
-# plt.title('Confusion Matrix (Random Forest)')
-# plt.show()
+# data.to_csv(csv_file_path, index=False)
 
-#----------------------------------------
-#           Running test file
-#----------------------------------------
+# print(f'CSV file &quot;{csv_file_path}&quot; has been created successfully.')
 
-test_df = pd.read_csv("test.csv")
-test_pred = model.predict(test_df)
-print(f"Accuracy: {accuracy_score(test_df, test_pred)}")
 
-test_pred.to_csv('kaggle_submission.csv', index=False)
+# ================================
+# LOAD DATA
+# ================================
+train = pd.read_csv("train.csv")
+test = pd.read_csv("test.csv")
 
-#----------------------------------------
-#HÄR ÄR KODEN SOM FELIX HAR SOM BESKRIVER -----------
-#print("PCA börjar nu")
-#X_scaled = StandardScaler().fit_transform(X_train)
-#pca = PCA(n_components=10)
-#X_transformed = pca.fit_transform(X_scaled)
-#eigenvalues = pca.explained_variance_
-#
-#plt.plot(eigenvalues)
-#plt.show()
+# Save target separately
+y = train["readmitted"]
 
-#-------------------------------------------------------------------------------
-#1.5 Send to new file! FIXED DIABETES should be ready to train ml algorithms on!
-csv_file_path = 'fixed_diabetes.csv'
+# ================================
+# PREPROCESS
+# ================================
+train_processed = apply_preprocessing(train)
+test_processed = apply_preprocessing(test)
 
-data.to_csv(csv_file_path, index=False)
+# Remove target from train features
+train_processed = train_processed.drop(columns="readmitted")
 
-print(f'CSV file &quot;{csv_file_path}&quot; has been created successfully.')
+# ================================
+# ALIGN COLUMNS (CRITICAL)
+# ================================
+test_processed = test_processed.reindex(columns=train_processed.columns, fill_value=0)
+
+# ================================
+# SAVE FILES
+# ================================
+train_processed["readmitted"] = y  # add back target
+
+train_processed.to_csv("train_processed.csv")
+test_processed.to_csv("test_processed.csv")
+
+print("✅ Files created:")
+print("- train_processed.csv")
+print("- test_processed.csv")
 
 
