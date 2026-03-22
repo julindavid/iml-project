@@ -3,9 +3,11 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, classification_report, log_loss
+from sklearn.metrics import accuracy_score, classification_report, log_loss, confusion_matrix
+from sklearn.decomposition import PCA
 import project
-
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # COLORS!
 class c:
@@ -59,6 +61,10 @@ test_Nan, test_string = checkdata(test_data)
 print(f"train--> \n Nan: {train_NaN},\n String:{train_string}")
 print("\n-----------------------------------------------------")
 print(f"test--> \n Nan: {test_Nan},\n String:{test_string}")
+print(train_data.columns)
+features_to_drop = ['patient_nbr', 'Unnamed: 0']
+train_data = train_data.drop(columns=features_to_drop, errors='ignore')
+test_data = test_data.drop(columns=features_to_drop, errors='ignore')
 
 project.print_uniq_vals2(train_data, "readmitted")
 
@@ -100,9 +106,8 @@ print(f"Cross-Entropy (Log Loss): {ce_loss:.4f}")
 sample = pd.read_csv("sample_submission.csv")
 
 #Match kaggle columns
-X_test_kaggle = test_data.drop(columns=["id"], errors="ignore")
+X_test_kaggle = test_data.drop(columns=["id", "unnamed: 0"], errors="ignore")
 X_test_kaggle = X_test_kaggle.reindex(columns=X.columns, fill_value=0)
-
 # Predict
 kaggle_pred = rf.predict(X_test_kaggle)
 
@@ -118,3 +123,57 @@ submission = pd.DataFrame({
 
 #Transfer result to csv file
 submission.to_csv("kaggle_result.csv", index=False)
+
+# FIX PLOTS AND RESULTS 
+
+# Compute confusion matrix
+cm = confusion_matrix(y_test, y_pred, labels=[0,1,2])
+
+plt.figure(figsize=(6,5))
+sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=['No','<30','>30'], yticklabels=['No','<30','>30'])
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.title("Confusion Matrix")
+plt.show()
+
+# Feature importance
+importances = rf.feature_importances_
+feat_names = X.columns
+feat_importance_df = pd.DataFrame({'Feature': feat_names, 'Importance': importances})
+feat_importance_df = feat_importance_df.sort_values(by='Importance', ascending=False).head(20)  # Top 20 features
+
+plt.figure(figsize=(10,6))
+sns.barplot(x='Importance', y='Feature', data=feat_importance_df)
+plt.title("Top 20 Feature Importances")
+plt.show()
+
+
+
+from sklearn.metrics import precision_recall_curve, average_precision_score
+from sklearn.preprocessing import label_binarize
+
+# Binarize the true labels for multi-class PR curve
+y_test_binarized = label_binarize(y_test, classes=[0,1,2])
+n_classes = y_test_binarized.shape[1]
+
+# Get predicted probabilities
+y_score = rf.predict_proba(X_test)
+
+plt.figure(figsize=(8,6))
+
+colors = ['blue', 'green', 'red']
+class_names = ['No', '<30', '>30']
+
+for i in range(n_classes):
+    precision, recall, _ = precision_recall_curve(y_test_binarized[:, i], y_score[i][:,i] if isinstance(y_score, list) else y_score[:, i])
+    ap = average_precision_score(y_test_binarized[:, i], y_score[i][:,i] if isinstance(y_score, list) else y_score[:, i])
+    plt.plot(recall, precision, color=colors[i], lw=2,
+             label=f'Class {class_names[i]} (AP={ap:.2f})')
+
+plt.xlabel('Recall')
+plt.ylabel('Precision')
+plt.title('Precision-Recall Curves (Validation Set)')
+plt.legend(loc='lower left')
+plt.grid(True, linestyle='--', alpha=0.5)
+plt.show()
+

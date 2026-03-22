@@ -96,7 +96,7 @@ def drop_columns(data):
     return data.drop(columns=[
         "weight", "payer_code", "medical_specialty",
         "encounter_id", "examide", "troglitazone",
-        "citoglipton", "diag_1", "diag_2", "diag_3"
+        "citoglipton", "diag_1", "diag_2", "diag_3", "patient_nbr"
     ])
 
 def ids_mapping(data):
