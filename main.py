@@ -76,6 +76,7 @@ X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42, stratify=y
 )
 
+#Model
 rf = RandomForestClassifier(
     n_estimators=100,
     class_weight="balanced",
@@ -96,14 +97,10 @@ y_proba = rf.predict_proba(X_test)
 ce_loss = log_loss(y_test, y_proba, labels=[0, 1, 2])
 print(f"Cross-Entropy (Log Loss): {ce_loss:.4f}")
 
-
-# Load sample submission (THIS FIXES EVERYTHING)
 sample = pd.read_csv("sample_submission.csv")
 
-# Prepare test features (same as training)
+#Match kaggle columns
 X_test_kaggle = test_data.drop(columns=["id"], errors="ignore")
-
-# Make sure columns match training EXACTLY
 X_test_kaggle = X_test_kaggle.reindex(columns=X.columns, fill_value=0)
 
 # Predict
@@ -119,6 +116,5 @@ submission = pd.DataFrame({
     "readmitted": kaggle_pred
 })
 
+#Transfer result to csv file
 submission.to_csv("kaggle_result.csv", index=False)
-
-print("✅ submission.csv created correctly")
