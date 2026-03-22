@@ -1,25 +1,13 @@
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
-import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression as lr
-from sklearn.ensemble import RandomForestClassifier
-import seaborn as sns
-from sklearn.preprocessing import OneHotEncoder
-import csv
-
-from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, classification_report, log_loss
 import project
 
-train_data = pd.read_csv('train_processed.csv')
-test_data = pd.read_csv('test_processed.csv')
 
-#COLORS!
+# COLORS!
 class c:
     PURPLE = '\033[95m'
     BLUE = '\033[94m'
@@ -32,32 +20,24 @@ class c:
     UNDERLINE = '\033[4m'
 
 
-#PREPROCESSING FIXED IN: project.py
-
-
-def checkdata(data): 
-    """
-    checks a data if there are any null values in any feature.
-    which features have string values that needs to be fixed
-    returns list1 with all feature names that has NaN values & list2 of features with string values
-    """
-    list1 = [] # Features with NaN values
-    list2 = [] # Features with string/object values
+def checkdata(data):
+    list1 = []
+    list2 = []
     numbers = []
     for feature in data.columns:
-        # 1. Check for null values
         isnull = data[feature].isnull().sum()
         if isnull > 0:
-            numbers.append(isnull)  
+            numbers.append(isnull)
             list1.append(feature)
             print(f"amount of null: {isnull}")
-            
-        # 2. Check for string (object) values that need fixing/encoding
-        # In pandas, strings are usually stored as 'object' or 'string'
+
         if data[feature].dtype == 'object' or data[feature].dtype == 'string':
             list2.append(feature)
     return list1, list2
+
+
 def map_label(data):
+    data = data.copy()
     data["readmitted"] = data["readmitted"].map({
         'No': 0,
         '<30': 1,
@@ -65,7 +45,12 @@ def map_label(data):
     })
     return data
 
-# test_data = project.fix_label(test_data)
+
+train_data = pd.read_csv('train_processed.csv')
+test_data = pd.read_csv('test_processed.csv')
+original_test = pd.read_csv("test.csv")
+ids = original_test["id"]
+X_test_kaggle = test_data.drop(columns=["id"], errors="ignore")
 train_data = map_label(train_data)
 
 train_NaN, train_string = checkdata(train_data)
@@ -77,9 +62,63 @@ print(f"test--> \n Nan: {test_Nan},\n String:{test_string}")
 
 project.print_uniq_vals2(train_data, "readmitted")
 
-#when submitting REVERSE result
-reverse_map = {0: 'No', 1: '<30', 2: '>30'}
-# submission["readmitted"] = submission["readmitted"].map(reverse_map)
+# -------------------------
+# train model
+# -------------------------
+y = train_data["readmitted"]
+X = train_data.drop(columns="readmitted")
 
-#------------------------------------------------------------------------------
-#train model
+# Remove id from features if it exists
+X = X.drop(columns=["id"], errors="ignore")
+X_test_kaggle = X_test_kaggle.reindex(columns=X.columns, fill_value=0)
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+rf = RandomForestClassifier(
+    n_estimators=100,
+    class_weight="balanced",
+    random_state=42,
+    n_jobs=-1
+)
+
+rf.fit(X_train, y_train)
+
+y_pred = rf.predict(X_test)
+acc = accuracy_score(y_test, y_pred)
+
+print(f"Test Accuracy: {acc:.4f}")
+print(classification_report(y_test, y_pred))
+
+# Optional: Cross-Entropy / Log Loss on your validation split
+y_proba = rf.predict_proba(X_test)
+ce_loss = log_loss(y_test, y_proba, labels=[0, 1, 2])
+print(f"Cross-Entropy (Log Loss): {ce_loss:.4f}")
+
+
+# Load sample submission (THIS FIXES EVERYTHING)
+sample = pd.read_csv("sample_submission.csv")
+
+# Prepare test features (same as training)
+X_test_kaggle = test_data.drop(columns=["id"], errors="ignore")
+
+# Make sure columns match training EXACTLY
+X_test_kaggle = X_test_kaggle.reindex(columns=X.columns, fill_value=0)
+
+# Predict
+kaggle_pred = rf.predict(X_test_kaggle)
+
+# Convert labels back to strings
+reverse_map = {0: 'No', 1: '<30', 2: '>30'}
+kaggle_pred = pd.Series(kaggle_pred).map(reverse_map)
+
+# Save submission
+submission = pd.DataFrame({
+    "id": ids,
+    "readmitted": kaggle_pred
+})
+
+submission.to_csv("kaggle_result.csv", index=False)
+
+print("✅ submission.csv created correctly")
